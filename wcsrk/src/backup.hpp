@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <map>
 #include <string>
+#include <memory>
 
 typedef struct sqlite3 sqlite3;
 

@@ -22,6 +22,8 @@
 #define parser_hpp
 
 #include <string>
+#include <memory>
+#include <vector>
 
 class ParseStatement;
 

@@ -24,6 +24,7 @@ LOCAL_LDLIBS := -llog -lz -ldl -latomic
 LOCAL_LDFLAGS := -Wl,--gc-sections -Wl,--version-script=$(root_path)/android/wcdb.map
 
 LOCAL_STATIC_LIBRARIES := \
+	wcdb-wcsrk \
 	wcdb-repair \
 	wcdb-backup \
 	wcdb-vfslog \
@@ -37,6 +38,18 @@ ifdef WITH_BUILD_INFO
 endif
 
 include $(BUILD_SHARED_LIBRARY)
+
+# New Repair
+LOCAL_PATH := $(root_path)/wcsrk/src
+include $(CLEAR_VARS)
+LOCAL_MODULE := wcdb-wcsrk
+LOCAL_CFLAGS := $(common_cflags)
+LOCAL_CPPFLAGS := -std=c++11
+LOCAL_C_INCLUDES := $(common_c_includes)
+LOCAL_SRC_FILES := \
+	$(subst $(LOCAL_PATH)/,,$(wildcard $(LOCAL_PATH)/*.cpp)) \
+	$(subst $(LOCAL_PATH)/,,$(wildcard $(LOCAL_PATH)/util/*.cpp))
+include $(BUILD_STATIC_LIBRARY)
 
 # Repair
 LOCAL_PATH := $(root_path)/repair

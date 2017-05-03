@@ -24,8 +24,7 @@
 
 Repair::Repair(const std::string& from, const Assist& assist)
 : m_parser(from, assist.pageSize, assist.reserveSize)
-, m_count(0)
-, m_assist(assist)
+, m_assist(assist), m_count(0)
 {
 }
 
@@ -56,7 +55,7 @@ bool Repair::repair(sqlite3* handle,
                     m_toParse.insert({realName, rootpage});
                 }
             }else {
-                printf("Error %d\n", result);
+                printf("Error %d\n", static_cast<int>(result));
             }
         }
     }
@@ -84,7 +83,7 @@ bool Repair::repair(sqlite3* handle,
                     }
                     recoverStatement->execWithValues(values);
                 }else {
-                    printf("Error %d\n", result);
+                    printf("Error %d\n", static_cast<int>(result));
                 }
             }
         }

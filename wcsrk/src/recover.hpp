@@ -22,7 +22,7 @@
 #define recover_hpp
 
 #include <memory>
-#include "value.hpp"
+#include "util/value.hpp"
 
 typedef struct sqlite3 sqlite3;
 typedef struct sqlite3_stmt sqlite3_stmt;

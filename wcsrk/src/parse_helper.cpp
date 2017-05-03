@@ -28,7 +28,7 @@ int32_t ParseHelper::ParseInt32(const unsigned char* data, const size_t& size)
 int64_t ParseHelper::ParseInt64(const unsigned char* data, const size_t& size)
 {
     int64_t out = 0;
-    for (int i = 0; i < size; i++) {
+    for (unsigned i = 0; i < size; i++) {
         // All int values in SQLite is big-endian
         int shift = ((int)size-1-i)*8;
         out |= (data[i]<<shift);
@@ -56,11 +56,11 @@ std::tuple<int64_t, int, bool> ParseHelper::ParseVarint(const unsigned char* dat
         out = (out<<7);
         i++;
         if (i>=varintMaxSize) {
-            return {false, false, false};
+            return std::tuple<int64_t, int, bool> {0LL, 0, false};
         }
     }
     out |= data[i];
-    return {out, i+1, true};
+    return std::tuple<int64_t, int, bool> {out, i+1, true};
 }
 
 int ParseHelper::ParseSerialTypeSize(int serialType)

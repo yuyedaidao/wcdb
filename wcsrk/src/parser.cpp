@@ -20,12 +20,12 @@
 
 #include "parser.hpp"
 #include "parse_statement.hpp"
-#include "file.hpp"
+#include "util/file.hpp"
 
 Parser::Parser(const std::string& p, int pageSize, int reservedSize)
 : path(p)
-, header(GetHeader(pageSize, reservedSize))
 , pageCount(GetPageCount(path, pageSize))
+, header(GetHeader(pageSize, reservedSize))
 {
 }
 

@@ -84,7 +84,7 @@ std::shared_ptr<Backup> Backup::BackupFromDataBase(const std::string& dbPath)
 
 std::shared_ptr<Backup> Backup::DecodeFromPath(const std::string& backupPath)
 {
-#warning TODO 反序列化
+//#warning TODO 反序列化
     return nullptr;
 }
 
@@ -97,7 +97,7 @@ Backup::Backup(const std::shared_ptr<std::map<std::string, int>>& i
 
 std::shared_ptr<unsigned char> Backup::encode(size_t& size)
 {
-#warning TODO 序列化
+//#warning TODO 序列化
 //    Backup::MAGIC
 //    Backup::VERSION
     return nullptr;

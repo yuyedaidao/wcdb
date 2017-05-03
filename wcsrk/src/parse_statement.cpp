@@ -19,13 +19,14 @@
  */
 
 #include "parse_statement.hpp"
-#include "value.hpp"
-#include "file.hpp"
+#include "util/value.hpp"
+#include "util/file.hpp"
 #include "parse_helper.hpp"
+#include <cassert>
+
 
 ParseStatement::ParseStatement(const Parser& parser, const std::vector<int>& pages)
-: m_parser(parser)
-, m_op(Op::Page)
+: m_op(Op::Page), m_parser(parser)
 {
     for (const auto& page : pages) {
         m_todo.push(page);
@@ -82,14 +83,14 @@ ParseStatement::Result ParseStatement::step()
             }
             case Op::CellPointerArray: {
                 int offsetCellPointerArray = (m_pageType==PageType::TableInterior)?12:8;
-                int cells = ParseHelper::ParseInt32(m_pageData.get()+m_pageHeaderOffset+3, 2);
+                uint32_t cells = ParseHelper::ParseInt32(m_pageData.get()+m_pageHeaderOffset+3, 2);
                 if (cells<=0
                     ||cells*2+offsetCellPointerArray>m_parser.header.pageSize) {
                     m_result = Result::Corrupt;
                     m_op = Op::Page;
                     break;
                 }
-                for (int i = 0; i < cells; i++) {
+                for (unsigned i = 0; i < cells; i++) {
                     int cellPointer = ParseHelper::ParseInt32(m_pageData.get()+(m_pageHeaderOffset+offsetCellPointerArray+i*2), 2);
                     m_cellPointerArray.push_back(cellPointer);
                 }
