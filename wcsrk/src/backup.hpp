@@ -21,6 +21,7 @@
 #ifndef backup_hpp
 #define backup_hpp
 
+#include "util/value.hpp"
 #include <stdio.h>
 #include <map>
 #include <string>
@@ -31,20 +32,32 @@ typedef struct sqlite3 sqlite3;
 class Backup
 {
 public:
-    static const char MAGIC[4];
-    static const int32_t VERSION;
 
-    static std::shared_ptr<Backup> BackupFromHandle(sqlite3* handle);
-    static std::shared_ptr<Backup> BackupFromDataBase(const std::string& dbPath);
-    static std::shared_ptr<Backup> DecodeFromPath(const std::string& backupPath);
+    struct MasterEntry {
+        enum Type { ENTRY_TABLE = 1, ENTRY_INDEX = 2 };
+
+        uint32_t rootPage;
+        Type type;
+        std::string sql;
+        std::string tableName;
+    };
+    typedef std::map<std::string, MasterEntry> MasterInfoMap;
+    typedef std::map<std::string, PersistValue> MetaInfoMap;
     
-    std::shared_ptr<unsigned char> encode(size_t& size);
+    bool loadFromDatabase(sqlite3* db);
+
+    bool saveToFile(const std::string& path, const void *pass, int passLen);
+    bool loadFromFile(const std::string& path, const void *pass, int passLen);
     
-    const std::shared_ptr<std::map<std::string, int32_t>> infos;//table name -> root page
-    const int32_t freePageCount;
-protected:
-    Backup(const std::shared_ptr<std::map<std::string, int>>& infos
-           , int32_t freePageCount);
+    const MasterInfoMap & masterInfo() const { return m_masterInfo; }
+    MetaInfoMap & metaInfo() { return m_metaInfo; }
+    const MetaInfoMap & metaInfo() const { return m_metaInfo; }
+
+private:
+    MasterInfoMap m_masterInfo;
+    MetaInfoMap m_metaInfo;
+    uint8_t m_kdfSalt[16];
+    // TODO: freeListCount
 };
 
 #endif /* backup_hpp */

@@ -27,6 +27,8 @@
 #include <memory>
 #include <stack>
 #include <set>
+#include <cstdint>
+#include "util/file.hpp"
 #include "util/value.hpp"
 
 class ParseStatement
@@ -93,6 +95,10 @@ protected:
     std::shared_ptr<unsigned char> m_payload;
     size_t m_payloadSize;
     std::vector<int> m_overflowPages;
+
+    // File and crypto
+    File m_file;
+    uint8_t m_kdfSalt[16];
 };
 
 #endif /* parse_statement_hpp */

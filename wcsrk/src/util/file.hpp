@@ -22,6 +22,7 @@
 #define file_hpp
 
 #include <string>
+#include <cstdio>
 
 class File
 {

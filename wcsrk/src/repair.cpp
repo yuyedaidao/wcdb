@@ -33,8 +33,8 @@ bool Repair::repair(sqlite3* handle,
                     std::function<void(std::string)> willParseTable)
 {
     if (m_assist.backup) {
-        for (const auto& iter : *m_assist.backup->infos) {
-            m_toParse.insert({iter.first, iter.second});
+        for (const auto &entry : (m_assist.backup)->masterInfo()) {
+            m_toParse.emplace(entry.first, entry.second.rootPage);
         }
     }
     
@@ -47,9 +47,9 @@ bool Repair::repair(sqlite3* handle,
                 ++m_count;
             }else if (result==ParseStatement::Result::Cell) {
                 auto values = statement->getValues();
-                const char* name = values->at(1).getTextValue();
+                const char* name = values->at(1).asText();
                 size_t size = values->at(1).getSize();
-                int rootpage = (int)values->at(3).getIntegerValue();
+                int rootpage = (int)values->at(3).asInteger();
                 if (name&&rootpage>0) {
                     std::string realName = std::string(name, size);
                     m_toParse.insert({realName, rootpage});

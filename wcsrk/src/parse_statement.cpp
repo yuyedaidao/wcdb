@@ -26,7 +26,7 @@
 
 
 ParseStatement::ParseStatement(const Parser& parser, const std::vector<int>& pages)
-: m_op(Op::Page), m_parser(parser)
+: m_op(Op::Page), m_parser(parser), m_file(parser.path, File::Mode::ReadOnly)
 {
     for (const auto& page : pages) {
         m_todo.push(page);
@@ -47,8 +47,7 @@ ParseStatement::Result ParseStatement::step()
                 m_pageno = m_todo.top();
                 m_todo.pop();
                 m_pageHeaderOffset = m_pageno==1?100:0;
-                File file(m_parser.path, File::Mode::ReadOnly);
-                if (!file.isOpened()) {
+                if (!m_file.isOpened()) {
                     m_result = Result::CantOpen;
                     break;
                 }
@@ -60,10 +59,13 @@ ParseStatement::Result ParseStatement::step()
                         break;
                     }
                 }
-                if (!file.read(m_pageData.get(), pageStart, m_parser.header.pageSize)) {
+                if (!m_file.read(m_pageData.get(), pageStart, m_parser.header.pageSize)) {
                     m_result = Result::IOError;
                     break;
                 }
+
+                // decode
+
                 m_pageType = (PageType)ParseHelper::ParseInt32(m_pageData.get()+(m_pageHeaderOffset+pageStart), 1);
                 switch (m_pageType) {
                     case PageType::IndexInterior:

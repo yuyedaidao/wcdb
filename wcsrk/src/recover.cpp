@@ -54,19 +54,19 @@ bool RecoverStatement::execWithValues(const std::shared_ptr<Values>& values)
         sqlite3_reset(m_stmt);
         const Value& value = values->at(i);
         switch (values->at(i).getType()) {
-            case ValueType::Integer:
-                sqlite3_bind_int64(m_stmt, (int)i, value.getIntegerValue());
+            case Value::TYPE_INTEGER:
+                sqlite3_bind_int64(m_stmt, (int)i, value.asInteger());
                 break;
-            case ValueType::Float:
-                sqlite3_bind_double(m_stmt, (int)i, value.getFloatValue());
+            case Value::TYPE_FLOAT:
+                sqlite3_bind_double(m_stmt, (int)i, value.asDouble());
                 break;
-            case ValueType::Text:
-                sqlite3_bind_text(m_stmt, (int)i, value.getTextValue(), (int)value.getSize(), SQLITE_STATIC);
+            case Value::TYPE_TEXT:
+                sqlite3_bind_text(m_stmt, (int)i, value.asText(), (int)value.getSize(), SQLITE_STATIC);
                 break;
-            case ValueType::BLOB:
-                sqlite3_bind_blob(m_stmt, (int)i, value.getBLOBValue(), (int)value.getSize(), SQLITE_STATIC);
+            case Value::TYPE_BLOB:
+                sqlite3_bind_blob(m_stmt, (int)i, value.asBlob(), (int)value.getSize(), SQLITE_STATIC);
                 break;
-            case ValueType::Null:
+            case Value::TYPE_NULL:
                 sqlite3_bind_null(m_stmt, (int)i);
                 break;
             default:

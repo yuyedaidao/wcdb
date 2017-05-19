@@ -21,104 +21,97 @@
 #ifndef value_hpp
 #define value_hpp
 
-#include <memory>
 #include <vector>
+#include <string>
+#include <memory>
+#include <cstdint>
 
-enum class ValueType
-{
-    Integer,
-    Float,
-    Text,
-    BLOB,
-    Null,
-};
-
-class BaseValue
-{
+class Value {
 public:
-    const ValueType type;
-protected:
-    BaseValue(ValueType theType);
-};
+    enum Type {
+        TYPE_NULL = 0,
+        TYPE_INTEGER,
+        TYPE_FLOAT,
+        TYPE_TEXT,
+        TYPE_BLOB,
+    };
 
-class IntegerValue : public BaseValue
-{
-public:
-    IntegerValue(int64_t theValue);
+    Value(std::nullptr_t = nullptr) : m_type(TYPE_NULL) {}
+
+    template <typename IntType>
+    Value(IntType value, typename std::enable_if<std::is_integral<IntType>::value>::type* = 0) 
+            : m_type(TYPE_INTEGER) { m_value.i = static_cast<int64_t>(value); }
+
+    template <typename FloatType>
+    Value(FloatType value, typename std::enable_if<std::is_floating_point<FloatType>::value>::type* = 0)
+            : m_type(TYPE_FLOAT) { m_value.d = static_cast<double>(value); }
     
-    const int64_t value;
-};
-
-class FloatValue : public BaseValue
-{
-public:
-    FloatValue(double theValue);
+    Value(const char *str, uint32_t len) : m_type(TYPE_TEXT) { 
+        m_value.buf.buf = (const uint8_t *) str; 
+        m_value.buf.len = len;
+    }
     
-    const double value;
-};
-
-class TextValue : public BaseValue
-{
-public:
-    TextValue(const char* theValue);
-    TextValue(const char* theValue, const size_t& theSize);
-
-    const char* value;
-    const size_t size;
-};
-
-class BLOBValue : public BaseValue
-{
-public:
-    BLOBValue(const unsigned char* theBytes, const size_t& theSize);
-    
-    const unsigned char* bytes;
-    const size_t size;
-};
-
-class NullValue : public BaseValue
-{
-public:
-    NullValue();
-};
-
-class Value
-{
-public:
-    template <typename T>
-    Value(const T& value, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr)
-    : m_value(new IntegerValue(value)) {
+    Value(const unsigned char *blob, uint32_t len) : m_type(TYPE_BLOB) { 
+        m_value.buf.buf = blob;
+        m_value.buf.len = len;
     }
 
-    template <typename T>
-    Value(const T& value, typename std::enable_if<std::is_floating_point<T>::value>::type* = nullptr)
-    : m_value(new FloatValue(value)) {
+    Value(Value &&rhs) : m_type(rhs.m_type) {
+        rhs.m_type = TYPE_NULL;
+        m_value = rhs.m_value;
     }
 
-    Value(const char* value);
+    Value & operator= (Value &&rhs) {
+        std::swap(m_type, rhs.m_type);
+        std::swap(m_value, rhs.m_value);
+        return *this;
+    }
 
-    Value(const char* value, const size_t& size);
-    
-    Value(const unsigned char* bytes, const size_t& size);
-
-    Value(std::nullptr_t = nullptr);
-
-    int64_t getIntegerValue() const;
-
-    double getFloatValue() const;
-
-    //it may return a non-termintor string
-    const char* getTextValue() const;
-
-    const unsigned char* getBLOBValue() const;
+    Type getType() const { return m_type; }
 
     size_t getSize() const;
+    int64_t asInteger() const;
+    double asDouble() const;
+    const char *asText() const;
+    const unsigned char *asBlob() const;
 
-    ValueType getType() const;
-protected:
-    const std::shared_ptr<BaseValue> m_value;
+private:
+    Type m_type;
+    union {
+        int64_t i;
+        double d;
+        struct {
+            const uint8_t *buf;
+            uint32_t len;
+        } buf;
+    } m_value;
 };
-
 typedef std::vector<Value> Values;
+
+
+class PersistValue : public Value {
+public:
+    PersistValue(std::nullptr_t = nullptr) : Value(nullptr) {}
+    
+    template <typename IntType>
+    PersistValue(IntType value, typename std::enable_if<std::is_integral<IntType>::value>::type* = 0)
+            : Value(value) {}
+    
+    template <typename FloatType>
+    PersistValue(FloatType value, typename std::enable_if<std::is_floating_point<FloatType>::value>::type* = 0)
+            : Value(value) {}
+
+    PersistValue(const std::string &str);
+    PersistValue(const char *str, uint32_t len);
+    PersistValue(std::unique_ptr<char[]> str, uint32_t len);
+
+    PersistValue(const unsigned char *blob, uint32_t len);
+    PersistValue(std::unique_ptr<unsigned char[]> blob, uint32_t len);
+
+    PersistValue(PersistValue &&) = default;
+    PersistValue & operator= (PersistValue &&) = default;
+
+    ~PersistValue();
+};
 
 #endif /* value_hpp */
