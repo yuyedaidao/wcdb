@@ -82,7 +82,7 @@ publishing {
 
 afterEvaluate {
     publishing.publications.wcdbLibrary {
-        artifact(bundleRelease)
+        artifact(source: bundleRelease, classifier: null)
         artifact(bundleReleaseJavadoc)
         artifact(bundleReleaseSources)
         artifact(bundleReleaseNativeSymbols)
