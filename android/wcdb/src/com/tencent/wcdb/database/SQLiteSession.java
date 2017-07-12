@@ -16,10 +16,13 @@
 
 package com.tencent.wcdb.database;
 
+import android.database.sqlite.SQLiteTransactionListener;
+
 import com.tencent.wcdb.BuildConfig;
 import com.tencent.wcdb.CursorWindow;
 import com.tencent.wcdb.DatabaseUtils;
 import com.tencent.wcdb.support.CancellationSignal;
+import com.tencent.wcdb.support.OperationCanceledException;
 
 /**
  * Provides a single client the ability to use a database.
