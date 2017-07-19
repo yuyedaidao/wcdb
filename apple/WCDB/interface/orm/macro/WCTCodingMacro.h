@@ -28,14 +28,15 @@
 #define __WCDB_PROPERTIES(className) _s_##className##_properties
 
 #define WCDB_IMPLEMENTATION(className)                                         \
-    static WCTBinding __WCDB_BINDING(className)(className.class);              \
+    static WCTBinding *__WCDB_BINDING(className)(                              \
+        new WCTBinding(className.class));                                      \
     static WCTPropertyList __WCDB_PROPERTIES(className);                       \
     +(const WCTBinding *) objectRelationalMappingForWCDB                       \
     {                                                                          \
         if (self.class != className.class) {                                   \
             WCDB::Error::Abort("Inheritance is not supported for ORM");        \
         }                                                                      \
-        return &__WCDB_BINDING(className);                                     \
+        return __WCDB_BINDING(className);                                      \
     }                                                                          \
     +(const WCTPropertyList &) AllProperties                                   \
     {                                                                          \
@@ -139,15 +140,28 @@
 
 //Index
 #define WCDB_INDEX(className, indexSubfixName, propertyName)                   \
-    __WCDB_INDEX_IMP(className, indexSubfixName, propertyName, WCTOrderedNotSet)
+    __WCDB_INDEX_IMP(className, indexSubfixName, propertyName,                 \
+                     WCTOrderedNotSet, false)
 
 #define WCDB_INDEX_ASC(className, indexSubfixName, propertyName)               \
     __WCDB_INDEX_IMP(className, indexSubfixName, propertyName,                 \
-                     WCTOrderedAscending)
+                     WCTOrderedAscending, false)
 
 #define WCDB_INDEX_DESC(className, indexSubfixName, propertyName)              \
     __WCDB_INDEX_IMP(className, indexSubfixName, propertyName,                 \
-                     WCTOrderedDescending)
+                     WCTOrderedDescending, false)
+
+#define WCDB_UNIQUE_INDEX(className, indexSubfixName, propertyName)            \
+    __WCDB_INDEX_IMP(className, indexSubfixName, propertyName,                 \
+                     WCTOrderedNotSet, true)
+
+#define WCDB_UNIQUE_INDEX_ASC(className, indexSubfixName, propertyName)        \
+    __WCDB_INDEX_IMP(className, indexSubfixName, propertyName,                 \
+                     WCTOrderedAscending, true)
+
+#define WCDB_UNIQUE_INDEX_DESC(className, indexSubfixName, propertyName)       \
+    __WCDB_INDEX_IMP(className, indexSubfixName, propertyName,                 \
+                     WCTOrderedDescending, true)
 
 //Virtual Table Argument
 #define WCDB_VIRTUAL_TABLE_ARGUMENT(className, left, right)                    \

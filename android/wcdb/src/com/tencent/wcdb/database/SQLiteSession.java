@@ -17,6 +17,7 @@
 package com.tencent.wcdb.database;
 
 import android.database.sqlite.SQLiteTransactionListener;
+import android.os.Process;
 
 import com.tencent.wcdb.BuildConfig;
 import com.tencent.wcdb.CursorWindow;
@@ -75,7 +76,7 @@ import com.tencent.wcdb.support.OperationCanceledException;
  * specifying the desired transaction mode.  Once an explicit transaction has begun,
  * all subsequent database operations will be performed as part of that transaction.
  * To end an explicit transaction, first call {@link #setTransactionSuccessful} if the
- * transaction was successful, then call {@link #end}.  If the transaction was
+ * transaction was successful, then call {@link #endTransaction}.  If the transaction was
  * marked successful, its changes will be committed, otherwise they will be rolled back.
  * </p><p>
  * Explicit transactions can also be nested.  A nested explicit transaction is
@@ -848,6 +849,7 @@ public final class SQLiteSession {
             mConnection = mConnectionPool.acquireConnection(sql, connectionFlags,
                     cancellationSignal); // might throw
             mConnectionFlags = connectionFlags;
+            mConnection.setAcquisitionState(Thread.currentThread(), Process.myTid());
         }
         mConnectionUseCount += 1;
     }
@@ -857,6 +859,7 @@ public final class SQLiteSession {
             throw new AssertionError("mConnection != null && mConnectionUseCount > 0");
         if (--mConnectionUseCount == 0) {
             try {
+                mConnection.setAcquisitionState(null, 0);
                 mConnectionPool.releaseConnection(mConnection); // might throw
             } finally {
                 mConnection = null;
