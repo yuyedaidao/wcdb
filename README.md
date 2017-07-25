@@ -97,6 +97,7 @@ Tutorials can be found [here][iOS-tutorial].
 ## Features
 
 * Database encryption via [SQLCipher][sqlcipher].
+* ORM/persistence solution via [Room][room] from Android Architecture Components.
 * Concurrent access via connection pooling from modern Android framework.
 * Repair toolkit for database corruption recovery.
 * Database backup and recovery utility optimized for small backup size.
@@ -114,12 +115,36 @@ app module:
 
 ```gradle
 dependencies {
-    compile 'com.tencent.wcdb:wcdb-android:1.0.2'
-    // Replace "1.0.2" to any available version.
+    compile 'com.tencent.wcdb:wcdb-android:1.0.3'
+    // Replace "1.0.3" to any available version.
 }
 ```
 
 This will cause Gradle to download AAR package from jcenter while building your application.
+
+If you want to use Room persistence library, you need to add the Google Maven repository to
+`build.gradle` to your **root project**.
+
+```gradle
+allprojects {
+    repositories {
+        jcenter()
+        // add the following line
+        maven { url 'https://maven.google.com' }
+    }
+}
+```
+
+Also add dependencies to module `build.gradle`.
+
+```gradle
+dependencies {
+    compile 'com.tencent.wcdb:wcdb-room:1.0.3'
+    // Replace "1.0.3" to any available version.
+
+    annotationProcessor 'android.arch.persistence.room:compiler:1.0.0-alpha5'
+}
+```
 
 ### Import Prebuilt AAR Package
 
@@ -157,6 +182,29 @@ SQLiteDatabase db = SQLiteDatabase.openOrCreateDatabase("/path/to/database", pas
 
 See `sample-encryptdb` for sample for transferring data between plain-text and encrypted
 databases.
+
+### Use WCDB with Room
+
+To use WCDB with Room library, follow the [Room instructions][room]. The only code to change
+is specifying `WCDBOpenHelperFactory` when getting instance of the database.
+
+```java
+SQLiteCipherSpec cipherSpec = new SQLiteCipherSpec()
+        .setPageSize(4096)
+        .setKDFIteration(64000);
+
+WCDBOpenHelperFactory factory = new WCDBOpenHelperFactory()
+        .passphrase("passphrase".getBytes())  // passphrase to the database, remove this line for plain-text
+        .cipherSpec(cipherSpec)               // cipher to use, remove for default settings
+        .writeAheadLoggingEnabled(true);      // enable WAL mode, remove if not needed
+
+AppDatabase db = Room.databaseBuilder(this, AppDatabase.class, "app-db")
+                .allowMainThreadQueries()
+                .openHelperFactory(factory)   // specify WCDBOpenHelperFactory when opening database
+                .build();
+```
+
+See `sample-persistence` for sample using Room library.
 
 ### Corruption Recovery
 
@@ -219,6 +267,7 @@ and place them to proper locations suitable for WCDB library building.
 [wcdb-docs-ios]: https://tencent.github.io/wcdb/references/ios/index.html
 [wcdb-docs-android]: https://tencent.github.io/wcdb/references/android/index.html
 [sqlcipher]: https://github.com/sqlcipher/sqlcipher
+[room]: https://developer.android.com/topic/libraries/architecture/room.html
 [iOS-tutorial]: https://github.com/Tencent/wcdb/wiki/iOS-macOS-Tutorial
 [Benchmark-iOS]: https://github.com/Tencent/wcdb/wiki/WCDB-iOS-benchmark
 
