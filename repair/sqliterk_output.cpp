@@ -40,6 +40,7 @@
 
 extern "C" {
 #include "sqliterk_os.h"
+#include "sqliterk_btree.h"
 }
 
 class CipherContext {
@@ -137,13 +138,12 @@ struct sqliterk_output_ctx {
     unsigned int success_count;
     unsigned int fail_count;
     volatile unsigned cancelled;
+
+    int (*callback)(void *user, sqliterk *rk, sqliterk_table *table, sqliterk_column *column);
+    void *user;
 };
 
-static void dummy_onBeginParseTable(sqliterk *rk, sqliterk_table *table)
-{
-}
-
-static void dummy_onEndParseTable(sqliterk *rk, sqliterk_table *table)
+static void dummyParseTableCallback(sqliterk *rk, sqliterk_table *table)
 {
 }
 
@@ -280,6 +280,16 @@ static int init_insert(sqliterk_output_ctx *ctx, const std::string &table)
     return ctx->real_columns;
 }
 
+static void table_onBeginParseTable(sqliterk *rk, sqliterk_table *table)
+{
+    sqliterk_output_ctx *ctx =
+        (sqliterk_output_ctx *) sqliterk_get_user_info(rk);
+
+    sqliterkBtreeSetMeta((sqliterk_btree *) table,
+                         ctx->table_cursor->first.c_str(),
+                         sqliterk_btree_type_table);
+}
+
 static int table_onParseColumn(sqliterk *rk,
                                sqliterk_table *table,
                                sqliterk_column *column)
@@ -290,9 +300,18 @@ static int table_onParseColumn(sqliterk *rk,
     if (ctx->cancelled)
         return SQLITERK_CANCELLED;
 
+    int rc;
+    if (ctx->callback) {
+        rc = ctx->callback(ctx->user, rk, table, column);
+        if (rc != SQLITERK_OK) {
+            if (rc == SQLITERK_IGNORE)
+                rc = SQLITERK_OK;
+            return rc;
+        }
+    }
+
     int columns = sqliterk_column_count(column);
     sqlite3_stmt *stmt = ctx->stmt;
-    int rc;
 
     if (!stmt) {
         // Invalid table_cursor means failed statement compilation.
@@ -386,6 +405,16 @@ int sqliterk_output(sqliterk *rk,
                     sqliterk_master_info *master_,
                     unsigned int flags)
 {
+    return sqliterk_output_cb(rk, db, master_, flags, NULL, NULL);
+}
+
+int sqliterk_output_cb(sqliterk *rk,
+                    sqlite3 *db,
+                    sqliterk_master_info *master_,
+                    unsigned int flags,
+                    int (*callback)(void *user, sqliterk *rk, sqliterk_table *table, sqliterk_column *column),
+                    void *user)
+{
     if (!rk || !db)
         return SQLITERK_MISUSE;
 
@@ -397,6 +426,8 @@ int sqliterk_output(sqliterk *rk,
     ctx.success_count = 0;
     ctx.fail_count = 0;
     ctx.ipk_column = 0;
+    ctx.callback = callback;
+    ctx.user = user;
     ctx.cancelled = 0;
 
     if (!master)
@@ -406,8 +437,8 @@ int sqliterk_output(sqliterk *rk,
 
     sqliterk_set_user_info(rk, &ctx);
     sqliterk_notify notify;
-    notify.onBeginParseTable = dummy_onBeginParseTable;
-    notify.onEndParseTable = dummy_onEndParseTable;
+    notify.onBeginParseTable = dummyParseTableCallback;
+    notify.onEndParseTable = dummyParseTableCallback;
     notify.onParseColumn = master_onParseColumn;
     sqliterk_register_notify(rk, notify);
     sqliterk_set_recursive(rk, 0);
@@ -428,6 +459,7 @@ int sqliterk_output(sqliterk *rk,
                        ctx.tables.size());
 
     // Parse all tables.
+    notify.onBeginParseTable = table_onBeginParseTable;
     notify.onParseColumn = table_onParseColumn;
     sqliterk_register_notify(rk, notify);
 
