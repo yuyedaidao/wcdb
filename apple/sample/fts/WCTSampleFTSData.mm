@@ -18,22 +18,15 @@
  * limitations under the License.
  */
 
-#include <WCDB/pragma.hpp>
-#include <WCDB/value_pragma.hpp>
+#import "WCTSampleFTSData.h"
+#import <WCDB/WCDB.h>
 
-namespace WCDB {
+@implementation WCTSampleFTSData
+WCDB_IMPLEMENTATION(WCTSampleFTSData)
+WCDB_SYNTHESIZE(WCTSampleFTSData, name)
+WCDB_SYNTHESIZE(WCTSampleFTSData, content)
 
-PragmaValue::PragmaValue(const Pragma &pragma)
-    : Describable(pragma.getDescription())
-{
-}
+WCDB_VIRTUAL_TABLE_MODULE(WCTSampleFTSData, WCTModuleNameFTS3)
+WCDB_VIRTUAL_TABLE_TOKENIZE(WCTSampleFTSData, WCTTokenizerNameWCDB)
 
-PragmaValue::PragmaValue(const std::string &value) : Describable(value)
-{
-}
-
-PragmaValue::PragmaValue(const char *value) : Describable(value)
-{
-}
-
-} //namespace WCDB
+@end

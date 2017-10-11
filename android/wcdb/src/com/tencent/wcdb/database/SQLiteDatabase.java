@@ -70,7 +70,14 @@ public final class SQLiteDatabase extends SQLiteClosable {
     private static final String TAG = "WCDB.SQLiteDatabase";
 
     static {
-        System.loadLibrary("wcdb");
+        // To be compatible to frameworks which handle native library loading themselves,
+        // we do a simple test for whether native methods have been registered already.
+        try {
+            SQLiteGlobal.nativeTestJNIRegistration();
+        } catch (UnsatisfiedLinkError e) {
+            // If we reached here, native methods are not registered.
+            System.loadLibrary("wcdb");
+        }
     }
     // Dummy static method to trigger class initialization.
     // See [JLS 12.4.1](http://docs.oracle.com/javase/specs/jls/se7/html/jls-12.html#jls-12.4.1)
@@ -185,6 +192,11 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
     private static final String[] CONFLICT_VALUES = new String[]
             {"", " OR ROLLBACK ", " OR ABORT ", " OR FAIL ", " OR IGNORE ", " OR REPLACE "};
+
+    public static final int SYNCHRONOUS_OFF = 0;
+    public static final int SYNCHRONOUS_NORMAL = 1;
+    public static final int SYNCHRONOUS_FULL = 2;
+    public static final int SYNCHRONOUS_EXTRA = 3;
 
     /**
      * Maximum Length Of A LIKE Or GLOB Pattern
@@ -1812,7 +1824,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
      * @throws SQLException if the SQL string is invalid
      */
     public void execSQL(String sql) throws SQLException {
-        executeSql(sql, null);
+        executeSql(sql, null, null);
     }
 
     /**
@@ -1859,13 +1871,38 @@ public final class SQLiteDatabase extends SQLiteClosable {
      * @throws SQLException if the SQL string is invalid
      */
     public void execSQL(String sql, Object[] bindArgs) throws SQLException {
-        if (bindArgs == null) {
-            throw new IllegalArgumentException("Empty bindArgs");
-        }
-        executeSql(sql, bindArgs);
+        executeSql(sql, bindArgs, null);
     }
 
-    private int executeSql(String sql, Object[] bindArgs) throws SQLException {
+    /**
+     * Execute a single SQL statement that is NOT a SELECT
+     * or any other SQL statement that returns data.
+     * <p>
+     * It has no means to return any data (such as the number of affected rows).
+     * Instead, you're encouraged to use {@link #insert(String, String, ContentValues)},
+     * {@link #update(String, ContentValues, String, String[])}, et al, when possible.
+     * </p>
+     * <p>
+     * When using {@link #enableWriteAheadLogging()}, journal_mode is
+     * automatically managed by this class. So, do not set journal_mode
+     * using "PRAGMA journal_mode'<value>" statement if your app is using
+     * {@link #enableWriteAheadLogging()}
+     * </p>
+     *
+     * @param sql      the SQL statement to be executed. Multiple statements separated by semicolons are
+     *                 not supported.
+     * @param bindArgs arguments to bind. Only byte[], String, Long and Double are supported.
+     * @param cancellationSignal A signal to cancel the operation in progress, or null if none.
+     *                           If the operation is canceled, then {@link OperationCanceledException} will be thrown
+     *                           when the query is executed.
+     * @throws SQLException if the SQL string is invalid
+     */
+    public void execSQL(String sql, Object[] bindArgs, CancellationSignal cancellationSignal) {
+        executeSql(sql, bindArgs, cancellationSignal);
+    }
+
+    private int executeSql(String sql, Object[] bindArgs, CancellationSignal cancellationSignal)
+            throws SQLException {
         acquireReference();
         try {
             if (DatabaseUtils.getSqlStatementType(sql) == DatabaseUtils.STATEMENT_ATTACH) {
@@ -1883,10 +1920,21 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
             SQLiteStatement statement = new SQLiteStatement(this, sql, bindArgs);
             try {
-                return statement.executeUpdateDelete();
+                return statement.executeUpdateDelete(cancellationSignal);
             } finally {
                 statement.close();
             }
+        } finally {
+            releaseReference();
+        }
+    }
+
+    public Pair<Integer, Integer> walCheckpoint(String dbName, boolean blockWriting) {
+        acquireReference();
+        try {
+            int connectionFlag = blockWriting ?
+                    SQLiteConnectionPool.CONNECTION_FLAG_PRIMARY_CONNECTION_AFFINITY : 0;
+            return getThreadSession().walCheckpoint(dbName, connectionFlag);
         } finally {
             releaseReference();
         }
@@ -1911,7 +1959,6 @@ public final class SQLiteDatabase extends SQLiteClosable {
      * Returns true if the database is in-memory db.
      *
      * @return True if the database is in-memory.
-     * @hide
      */
     public boolean isInMemoryDatabase() {
         synchronized (mLock) {
@@ -2056,6 +2103,77 @@ public final class SQLiteDatabase extends SQLiteClosable {
                 throw ex;
             }
         }
+    }
+
+    /**
+     * Returns {@link SQLiteCheckpointListener} object previously set.
+     *
+     * @return callback object set to the database
+     */
+    public SQLiteCheckpointListener getCheckpointCallback() {
+        synchronized (mLock) {
+            throwIfNotOpenLocked();
+            if (!mConfigurationLocked.customWALHookEnabled)
+                return null;
+
+            return mConnectionPoolLocked.getCheckpointListener();
+        }
+    }
+
+    /**
+     * Set callback object to be called on each commit in WAL mode.
+     *
+     * <p>Use this callback for customized WAL checkpoint operations for different situations an
+     * applications. For general applications, you probably want {@link #setAsyncCheckpointEnabled(boolean)}
+     * for asynchronous checkpointing on a separate thread.</p>
+     *
+     * <p>Callback object won't be called in journal modes other than WAL.</p>
+     *
+     * @param callback callback object to be set, or null to disable customized checkpointing
+     */
+    public void setCheckpointCallback(SQLiteCheckpointListener callback) {
+        boolean customWALHookEnabled = (callback != null);
+
+        synchronized (mLock) {
+            throwIfNotOpenLocked();
+
+            if (mConfigurationLocked.customWALHookEnabled != customWALHookEnabled) {
+                mConfigurationLocked.customWALHookEnabled = customWALHookEnabled;
+                try {
+                    mConnectionPoolLocked.reconfigure(mConfigurationLocked);
+                } catch (RuntimeException ex) {
+                    mConfigurationLocked.customWALHookEnabled = !customWALHookEnabled;
+                    throw ex;
+                }
+            }
+
+            mConnectionPoolLocked.setCheckpointListener(callback);
+        }
+    }
+
+    /**
+     * Returns whether asynchronous checkpointing is enabled.
+     *
+     * @return true if asynchronous checkpointing is enabled
+     */
+    public boolean getAsyncCheckpointEnabled() {
+        SQLiteCheckpointListener listener = getCheckpointCallback();
+        return (listener != null) && (listener instanceof SQLiteAsyncCheckpointer);
+    }
+
+    /**
+     * Set whether to use asynchronous checkpointing strategy in WAL mode. Asynchronous checkpointing
+     * runs checkpoint operations on a separate thread, which may improve performance in WAL mode.
+     *
+     * <p>This method calls {@link #setCheckpointCallback(SQLiteCheckpointListener)}, thus will overwrite
+     * previous callbacks set by that method.</p>
+     *
+     * @param enabled true if asynchronous checkpointing is to be enabled
+     */
+    public void setAsyncCheckpointEnabled(boolean enabled) {
+        SQLiteCheckpointListener callback = enabled ?
+                new SQLiteAsyncCheckpointer() : null;
+        setCheckpointCallback(callback);
     }
 
     /**
@@ -2211,12 +2329,52 @@ public final class SQLiteDatabase extends SQLiteClosable {
         }
     }
 
+    public int getSynchronousMode() {
+        synchronized (mLock) {
+            throwIfNotOpenLocked();
+
+            return mConfigurationLocked.synchronousMode;
+        }
+    }
+
+    public void setSynchronousMode(int mode) {
+        synchronized (mLock) {
+            throwIfNotOpenLocked();
+
+            final int oldMode = mConfigurationLocked.synchronousMode;
+            if (oldMode != mode) {
+                mConfigurationLocked.synchronousMode = mode;
+                try {
+                    mConnectionPoolLocked.reconfigure(mConfigurationLocked);
+                } catch (RuntimeException ex) {
+                    mConfigurationLocked.synchronousMode = oldMode;
+                    throw ex;
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns the {@link SQLiteTrace} object bound to this database.
+     *
+     * @return {@link SQLiteTrace} object bound to this database
+     * @see SQLiteTrace
+     * @see #setTraceCallback(SQLiteTrace)
+     */
     public SQLiteTrace getTraceCallback() {
         synchronized (mLock) {
             throwIfNotOpenLocked();
             return mConnectionPoolLocked.getTraceCallback();
         }
     }
+
+    /**
+     * Bind a {@link SQLiteTrace} callback object for tracing database performance.
+     * When a callback object was bound, its methods will be called on various event, such as
+     * a SQL statement was executed or a database connection was granted to a thread.
+     *
+     * @param callback callback object to be set, or null to disable tracing.
+     */
     public void setTraceCallback(SQLiteTrace callback) {
         synchronized (mLock) {
             throwIfNotOpenLocked();
@@ -2255,6 +2413,9 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /**
      * Dump detailed information about all open databases in the current process.
      * Used by bug report.
+     *
+     * @param printer printer used to receive or output log messages
+     * @param verbose true if verbose messages is requested
      */
     public static void dumpAll(Printer printer, boolean verbose) {
         for (SQLiteDatabase db : getActiveDatabases()) {
@@ -2262,6 +2423,12 @@ public final class SQLiteDatabase extends SQLiteClosable {
         }
     }
 
+    /**
+     * Dump detailed information about this database.
+     *
+     * @param printer printer used to receive or output log messages
+     * @param verbose true if verbose messages is requested
+     */
     public void dump(Printer printer, boolean verbose) {
         synchronized (mLock) {
             if (mConnectionPoolLocked != null) {
@@ -2271,7 +2438,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
     }
 
     /**
-     * Returns list of full pathnames of all attached databases including the main database
+     * Returns list of full path-names of all attached databases including the main database
      * by executing 'pragma database_list' on the database.
      *
      * @return ArrayList of pairs of (database name, database file path) or null if the database

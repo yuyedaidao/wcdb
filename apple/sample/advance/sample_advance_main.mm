@@ -21,6 +21,7 @@
 #import "sample_advance_main.h"
 #import "WCTSampleAdvance+WCTTableCoding.h"
 #import "WCTSampleAdvance.h"
+#import "WCTSampleAdvanceMulti+WCTTableCoding.h"
 #import "WCTSampleAdvanceMulti.h"
 
 void sample_advance_main(NSString *baseDirectory)
@@ -68,6 +69,19 @@ void sample_advance_main(NSString *baseDirectory)
         WCTMultiSelect *select = [[database prepareSelectMultiObjectsOnResults:{
                                                                                    WCTSampleAdvance.intValue.inTable(tableName),
                                                                                    WCTSampleAdvanceMulti.intValue.inTable(tableName2)}
+                                                                    fromTables:@[ tableName, tableName2 ]] where:WCTSampleAdvance.intValue.inTable(tableName) == WCTSampleAdvanceMulti.intValue.inTable(tableName2)];
+        NSArray<WCTMultiObject *> *multiObjects = select.allMultiObjects;
+        for (WCTMultiObject *multiObjects : multiObjects) {
+            WCTSampleAdvance *object1 = (WCTSampleAdvance *) [multiObjects objectForKey:tableName];
+            WCTSampleAdvanceMulti *object2 = (WCTSampleAdvanceMulti *) [multiObjects objectForKey:tableName2];
+        }
+    }
+
+    //Multi select
+    {
+        WCTMultiSelect *select = [[database prepareSelectMultiObjectsOnResults:{
+                                                                                   WCTSampleAdvance.AllProperties.inTable(tableName),
+                                                                                   WCTSampleAdvanceMulti.AllProperties.inTable(tableName2)}
                                                                     fromTables:@[ tableName, tableName2 ]] where:WCTSampleAdvance.intValue.inTable(tableName) == WCTSampleAdvanceMulti.intValue.inTable(tableName2)];
         NSArray<WCTMultiObject *> *multiObjects = select.allMultiObjects;
         for (WCTMultiObject *multiObjects : multiObjects) {

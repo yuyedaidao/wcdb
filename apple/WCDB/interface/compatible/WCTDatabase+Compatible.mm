@@ -18,31 +18,34 @@
  * limitations under the License.
  */
 
-#ifdef WCDB_BUILTIN_COLUMN_CODING
+#ifndef WCDB_OMIT_DEPRECATED
 
-#import <Foundation/Foundation.h>
-#import <WCDB/WCDB.h>
+#import <WCDB/WCTDatabase+Compatible.h>
+#import <WCDB/WCTDatabase+Core.h>
+#import <WCDB/WCTDatabase+Table.h>
 
-@interface NSURL (WCTColumnCoding) <WCTColumnCoding>
+@implementation WCTDatabase (Compatible)
+
+- (void)setSyncEnabled:(BOOL)sync
+{
+    [self setSynchronousFull:sync];
+}
+
++ (NSString *)DefaultSyncConfigName
+{
+    return [self DefaultSynchronousConfigName];
+}
+
+- (BOOL)createVirtualTableOfName:(NSString *)tableName usingModule:(NSString *)moduleName withClass:(Class)cls
+{
+    return [self createVirtualTableOfName:tableName withClass:cls];
+}
+
++ (NSString *)DefaultConfigName
+{
+    return [self DefaultBasicConfigName];
+}
+
 @end
 
-@implementation NSURL (WCTColumnCoding)
-
-+ (instancetype)unarchiveWithWCTValue:(NSString *)value
-{
-    return value ? [NSKeyedUnarchiver unarchiveObjectWithData:self] : nil;
-}
-
-- (NSData *)archivedWCTValue
-{
-    return [NSKeyedArchiver archivedDataWithRootObject:self];
-}
-
-+ (WCTColumnType)columnTypeForWCDB
-{
-    return WCTColumnTypeBinary;
-}
-
-@end
-
-#endif //WCDB_BUILTIN_COLUMN_CODING
+#endif //WCDB_OMIT_DEPRECATED

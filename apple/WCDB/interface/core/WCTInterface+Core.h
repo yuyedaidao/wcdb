@@ -21,7 +21,7 @@
 #import <Foundation/Foundation.h>
 #import <WCDB/WCTDeclare.h>
 #import <WCDB/WCTInterface.h>
-#import <WCDB/WINQ.h>
+#import <WCDB/abstract.h>
 
 @interface WCTInterface (Core)
 
@@ -34,12 +34,20 @@
 - (BOOL)exec:(const WCDB::Statement &)statement;
 
 /**
- @brief Prepare a specific sql.
-        Note that you can use this interface to prepare a SQL that is not contained in the WCDB interface layer
+ @brief This interface is equivalent to [interface prepare:statement withError:nil];
  @param statement WINQ statement
  @return WCTStatement
  @see WCTStatement
  */
 - (WCTStatement *)prepare:(const WCDB::Statement &)statement;
+
+/**
+ @brief Prepare a specific sql.
+ Note that you can use this interface to prepare a SQL that is not contained in the WCDB interface layer
+ @param statement WINQ statement
+ @return WCTStatement
+ @see WCTStatement
+ */
+- (WCTStatement *)prepare:(const WCDB::Statement &)statement withError:(WCTError **)error;
 
 @end

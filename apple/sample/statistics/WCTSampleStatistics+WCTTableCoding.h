@@ -18,31 +18,11 @@
  * limitations under the License.
  */
 
-#ifdef WCDB_BUILTIN_COLUMN_CODING
-
-#import <Foundation/Foundation.h>
+#import "WCTSampleStatistics.h"
 #import <WCDB/WCDB.h>
 
-@interface NSValue (WCTColumnCoding) <WCTColumnCoding>
-@end
+@interface WCTSampleStatistics (WCTTableCoding) <WCTTableCoding>
 
-@implementation NSValue (WCTColumnCoding)
-
-+ (instancetype)unarchiveWithWCTValue:(NSData *)value
-{
-    return value ? [NSKeyedUnarchiver unarchiveObjectWithData:value] : nil;
-}
-
-- (NSData *)archivedWCTValue
-{
-    return [NSKeyedArchiver archivedDataWithRootObject:self];
-}
-
-+ (WCTColumnType)columnTypeForWCDB
-{
-    return WCTColumnTypeBinary;
-}
+WCDB_PROPERTY(intValue)
 
 @end
-
-#endif //WCDB_BUILTIN_COLUMN_CODING

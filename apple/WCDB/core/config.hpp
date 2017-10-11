@@ -21,7 +21,7 @@
 #ifndef config_hpp
 #define config_hpp
 
-#include <WCDB/WINQ.h>
+#include <WCDB/abstract.h>
 #include <WCDB/error.hpp>
 #include <WCDB/rwlock.hpp>
 #include <WCDB/utility.hpp>
@@ -75,6 +75,8 @@ public:
 
     Configs();
     Configs(std::initializer_list<const ConfigWrap> configs);
+
+    Config getConfigByName(const std::string &name) const;
 
 protected:
     typedef std::list<ConfigWrap> ConfigList;

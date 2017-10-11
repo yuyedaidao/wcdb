@@ -63,10 +63,9 @@ WCTExpr::WCTExpr(const typename WCDB::ColumnTypeInfo<WCDB::ColumnType::BLOB>::CT
 }
 
 WCTExpr::WCTExpr(WCTValue *value)
-    : WCDB::Expr()
+    : WCDB::Expr(literalValue(value))
     , WCTPropertyBase(nil, nullptr)
 {
-    m_description = literalValue(value);
 }
 
 WCTExpr::WCTExpr(const WCDB::Expr &expr, const WCTPropertyBase &propertyBase)
@@ -79,11 +78,6 @@ WCTExpr::WCTExpr(const WCDB::Expr &expr)
     : WCDB::Expr(expr)
     , WCTPropertyBase(nil, nullptr)
 {
-}
-
-WCTExpr::operator WCTExprList() const
-{
-    return {*this};
 }
 
 WCTResult WCTExpr::as(const WCTProperty &property)
@@ -112,6 +106,11 @@ WCTExpr WCTExpr::operator+() const
 WCTExpr WCTExpr::operator-() const
 {
     return WCTExpr(Expr::operator-(), *this);
+}
+
+WCTExpr WCTExpr::operator~() const
+{
+    return WCTExpr(Expr::operator~(), *this);
 }
 
 WCTExpr WCTExpr::operator||(const WCTExpr &operand) const
@@ -186,6 +185,11 @@ WCTExpr WCTExpr::operator!=(const WCTExpr &operand) const
 WCTExpr WCTExpr::concat(const WCTExpr &operand) const
 {
     return WCTExpr(Expr::concat(operand));
+}
+
+WCTExpr WCTExpr::substr(const WCTExpr &start, const WCTExpr &length) const
+{
+    return WCTExpr(Expr::substr(start, length), *this);
 }
 
 WCTExpr WCTExpr::in(const WCTExprList &exprList) const
@@ -401,6 +405,21 @@ WCTExpr WCTExpr::round(bool distinct) const
     return WCTExpr(Expr::round(distinct), *this);
 }
 
+WCTExpr WCTExpr::matchinfo() const
+{
+    return WCTExpr(Expr::matchinfo(), *this);
+}
+
+WCTExpr WCTExpr::offsets() const
+{
+    return WCTExpr(Expr::offsets(), *this);
+}
+
+WCTExpr WCTExpr::snippet() const
+{
+    return WCTExpr(Expr::snippet(), *this);
+}
+
 NSString *WCTExpr::getDescription() const
 {
     return [NSString stringWithUTF8String:WCDB::Expr::getDescription().c_str()];
@@ -411,7 +430,7 @@ WCTExpr WCTExpr::Function(NSString *function, const WCTExprList &exprList)
     return WCTExpr(Expr::Function(function.UTF8String, exprList));
 }
 
-std::string WCTExpr::literalValue(WCTValue *value)
+WCDB::LiteralValue WCTExpr::literalValue(WCTValue *value)
 {
     WCTValueType valueType = [value valueType];
     if (valueType == WCTValueTypeColumnCoding) {
@@ -421,30 +440,50 @@ std::string WCTExpr::literalValue(WCTValue *value)
     switch (valueType) {
         case WCTValueTypeString: {
             NSString *string = (NSString *) value;
-            return WCDB::Expr::literalValue(string.UTF8String);
+            return WCDB::LiteralValue(string.UTF8String);
         } break;
         case WCTValueTypeNumber: {
             NSNumber *number = (NSNumber *) value;
             if (CFNumberIsFloatType((CFNumberRef) number)) {
-                return WCDB::Expr::literalValue(number.doubleValue);
+                return WCDB::LiteralValue(number.doubleValue);
             } else {
                 if (CFNumberGetByteSize((CFNumberRef) number) <= 4) {
-                    return WCDB::Expr::literalValue(number.intValue);
+                    return WCDB::LiteralValue(number.intValue);
                 } else {
-                    return WCDB::Expr::literalValue(number.longLongValue);
+                    return WCDB::LiteralValue(number.longLongValue);
                 }
             }
         } break;
         case WCTValueTypeData: {
             NSData *data = (NSData *) value;
-            return WCDB::Expr::literalValue(data.bytes, (int) data.length);
+            return WCDB::LiteralValue(data.bytes, (int) data.length);
         } break;
         case WCTValueTypeNil: {
-            return WCDB::Expr::literalValue(nullptr);
+            return WCDB::LiteralValue(nullptr);
         } break;
         default:
             WCDB::Error::Abort(([NSString stringWithFormat:@"Converting an unknown class [%@]", NSStringFromClass(value.class)].UTF8String));
             break;
     }
     return "";
+}
+
+WCTExpr WCTExpr::Case(const WCTExpr &case_, const std::list<std::pair<WCTExpr, WCTExpr>> &when, const std::list<WCTExpr> &else_)
+{
+    return WCTExpr(Expr::Case(case_, when, else_));
+}
+
+WCTExprList::WCTExprList()
+    : std::list<const WCTExpr>()
+{
+}
+
+WCTExprList::WCTExprList(const WCTExpr &expr)
+    : std::list<const WCTExpr>({expr})
+{
+}
+
+WCTExprList::WCTExprList(std::initializer_list<const WCTExpr> il)
+    : std::list<const WCTExpr>(il.begin(), il.end())
+{
 }

@@ -19,52 +19,25 @@
  */
 
 #include <WCDB/database.hpp>
+#include <WCDB/fts_modules.hpp>
 #include <WCDB/handle_statement.hpp>
 #include <WCDB/macro.hpp>
 #include <WCDB/timed_queue.hpp>
 #include <WCDB/utility.hpp>
 #include <queue>
-#include <sqlcipher/sqlite3.h>
 #include <thread>
 #include <vector>
 
 namespace WCDB {
 
-const std::string Database::defaultConfigName = "default";
+const std::string Database::defaultBasicConfigName = "basic";
 const std::string Database::defaultCipherConfigName = "cipher";
 const std::string Database::defaultTraceConfigName = "trace";
 const std::string Database::defaultCheckpointConfigName = "checkpoint";
-const std::string Database::defaultSyncConfigName = "sync";
+const std::string Database::defaultSynchronousConfigName = "synchronous";
+const std::string Database::defaultTokenizeConfigName = "tokenize";
 std::shared_ptr<PerformanceTrace> Database::s_globalPerformanceTrace = nullptr;
 std::shared_ptr<SQLTrace> Database::s_globalSQLTrace = nullptr;
-
-static const Config s_checkpointConfig = [](std::shared_ptr<Handle> &handle,
-                                            Error &error) -> bool {
-    handle->registerCommitedHook(
-        [](Handle *handle, int pages, void *) {
-            static TimedQueue<std::string> s_timedQueue(2);
-            if (pages > 1000) {
-                s_timedQueue.reQueue(handle->path);
-            }
-            static std::thread s_checkpointThread([]() {
-                pthread_setname_np(
-                    ("WCDB-" + Database::defaultCheckpointConfigName).c_str());
-                while (true) {
-                    s_timedQueue.waitUntilExpired([](const std::string &path) {
-                        Database database(path);
-                        WCDB::Error innerError;
-                        database.exec(
-                            StatementPragma().pragma(Pragma::WalCheckpoint),
-                            innerError);
-                    });
-                }
-            });
-            static std::once_flag s_flag;
-            std::call_once(s_flag, []() { s_checkpointThread.detach(); });
-        },
-        nullptr);
-    return true;
-};
 
 const Configs Database::defaultConfigs(
     {{
@@ -85,7 +58,7 @@ const Configs Database::defaultConfigs(
              }
              return true;
          },
-         0,
+         (Configs::Order) Database::ConfigOrder::Trace,
      },
      {
          Database::defaultCipherConfigName,
@@ -93,10 +66,10 @@ const Configs Database::defaultConfigs(
              //place holder
              return true;
          },
-         1,
+         (Configs::Order) Database::ConfigOrder::Cipher,
      },
      {
-         Database::defaultConfigName,
+         Database::defaultBasicConfigName,
          [](std::shared_ptr<Handle> &handle, Error &error) -> bool {
 
              //Locking Mode
@@ -132,10 +105,10 @@ const Configs Database::defaultConfigs(
 
              //Synchronous
              {
-                 static const StatementPragma s_setSynchronousFull =
+                 static const StatementPragma s_setSynchronousNormal =
                      StatementPragma().pragma(Pragma::Synchronous, "NORMAL");
 
-                 if (!handle->exec(s_setSynchronousFull)) {
+                 if (!handle->exec(s_setSynchronousNormal)) {
                      error = handle->getError();
                      return false;
                  }
@@ -172,20 +145,64 @@ const Configs Database::defaultConfigs(
                  }
              }
 
+             //Fullfsync
+             {
+                 static const StatementPragma s_setFullFsync =
+                     StatementPragma().pragma(Pragma::Fullfsync, true);
+
+                 if (!handle->exec(s_setFullFsync)) {
+                     error = handle->getError();
+                     return false;
+                 }
+             }
+
              error.reset();
              return true;
          },
-         2,
+         (Configs::Order) Database::ConfigOrder::Basic,
      },
      {
-         Database::defaultSyncConfigName,
+         Database::defaultSynchronousConfigName,
          nullptr, //placeholder
-         3,
+         (Configs::Order) Database::ConfigOrder::Synchronous,
      },
      {
          Database::defaultCheckpointConfigName,
-         s_checkpointConfig, //checkpoint opti
-         4,
+         [](std::shared_ptr<Handle> &handle, Error &error) -> bool {
+             handle->registerCommitedHook(
+                 [](Handle *handle, int pages, void *) {
+                     static TimedQueue<std::string> s_timedQueue(2);
+                     if (pages > 1000) {
+                         s_timedQueue.reQueue(handle->path);
+                     }
+                     static std::thread s_checkpointThread([]() {
+                         pthread_setname_np(
+                             ("WCDB-" + Database::defaultCheckpointConfigName)
+                                 .c_str());
+                         while (true) {
+                             s_timedQueue.waitUntilExpired(
+                                 [](const std::string &path) {
+                                     Database database(path);
+                                     WCDB::Error innerError;
+                                     database.exec(StatementPragma().pragma(
+                                                       Pragma::WalCheckpoint),
+                                                   innerError);
+                                 });
+                         }
+                     });
+                     static std::once_flag s_flag;
+                     std::call_once(s_flag,
+                                    []() { s_checkpointThread.detach(); });
+                 },
+                 nullptr);
+             return true;
+         },
+         (Configs::Order) Database::ConfigOrder::Checkpoint,
+     },
+     {
+         Database::defaultTokenizeConfigName,
+         nullptr, //placeholder
+         (Configs::Order) Database::ConfigOrder::Tokenize,
      }});
 
 void Database::setConfig(const std::string &name,
@@ -198,11 +215,6 @@ void Database::setConfig(const std::string &name,
 void Database::setConfig(const std::string &name, const Config &config)
 {
     m_pool->setConfig(name, config);
-}
-
-void Database::setCipher(const void *key, int keySize)
-{
-    setCipher(key, keySize, 4096);
 }
 
 void Database::setCipher(const void *key, int keySize, int pageSize)
@@ -244,11 +256,11 @@ void Database::setPerformanceTrace(const PerformanceTrace &trace)
         });
 }
 
-void Database::setSyncEnabled(bool sync)
+void Database::setSynchronousFull(bool full)
 {
-    if (sync) {
+    if (full) {
         m_pool->setConfig(
-            Database::defaultSyncConfigName,
+            Database::defaultSynchronousConfigName,
             [](std::shared_ptr<Handle> &handle, Error &error) -> bool {
 
                 //Synchronous
@@ -262,39 +274,55 @@ void Database::setSyncEnabled(bool sync)
                     }
                 }
 
-                //Checkpoint Fullfsync
-                {
-                    static const StatementPragma s_setCheckpointFullfsync =
-                        StatementPragma().pragma(Pragma::CheckpointFullfsync,
-                                                 true);
-
-                    if (!handle->exec(s_setCheckpointFullfsync)) {
-                        error = handle->getError();
-                        return false;
-                    }
-                }
-
-                //Fullfsync
-                {
-                    static const StatementPragma s_setFullFsync =
-                        StatementPragma().pragma(Pragma::Fullfsync, true);
-
-                    if (!handle->exec(s_setFullFsync)) {
-                        error = handle->getError();
-                        return false;
-                    }
-                }
-
                 error.reset();
                 return true;
             });
         //disable checkpoint opti for sync
         m_pool->setConfig(Database::defaultCheckpointConfigName, nullptr);
     } else {
-        m_pool->setConfig(Database::defaultSyncConfigName, nullptr);
+        m_pool->setConfig(Database::defaultSynchronousConfigName, nullptr);
         m_pool->setConfig(Database::defaultCheckpointConfigName,
-                          s_checkpointConfig);
+                          Database::defaultConfigs.getConfigByName(
+                              Database::defaultCheckpointConfigName));
     }
+}
+
+void Database::setTokenizes(const std::list<std::string> &tokenizeNames)
+{
+    m_pool->setConfig(
+        Database::defaultTokenizeConfigName,
+        [tokenizeNames](std::shared_ptr<Handle> &handle, Error &error) -> bool {
+            for (const std::string &tokenizeName : tokenizeNames) {
+                const void *address =
+                    FTS::Modules::SharedModules()->getAddress(tokenizeName);
+
+                if (!address) {
+                    Error::Abort("Tokenize name is not registered");
+                }
+
+                //Tokenize
+                {
+                    std::shared_ptr<StatementHandle> statementHandle =
+                        handle->prepare(StatementSelect::Fts3Tokenizer);
+                    if (!statementHandle) {
+                        error = handle->getError();
+                        return false;
+                    }
+                    statementHandle->bind<WCDB::ColumnType::Text>(
+                        tokenizeName.c_str(), 1);
+                    statementHandle->bind<WCDB::ColumnType::BLOB>(
+                        &address, sizeof(address), 2);
+                    statementHandle->step();
+                    if (!statementHandle->isOK()) {
+                        error = statementHandle->getError();
+                        return false;
+                    }
+                }
+            }
+
+            error.reset();
+            return true;
+        });
 }
 
 void Database::SetGlobalPerformanceTrace(const PerformanceTrace &globalTrace)

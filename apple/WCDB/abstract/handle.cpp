@@ -90,25 +90,6 @@ void Handle::close()
                         sqlite3_errmsg((sqlite3 *) m_handle), &m_error);
 }
 
-bool Handle::isTableExists(const std::string &tableName)
-{
-    int rc = sqlite3_table_column_metadata((sqlite3 *) m_handle, nullptr,
-                                           tableName.c_str(), nullptr, nullptr,
-                                           nullptr, nullptr, nullptr, nullptr);
-    if (rc == SQLITE_OK) {
-        m_error.reset();
-        return true;
-    }
-    if (rc == SQLITE_ERROR) {
-        m_error.reset();
-        return false;
-    }
-    Error::ReportSQLite(m_tag, path, Error::HandleOperation::IsTableExists, rc,
-                        sqlite3_extended_errcode((sqlite3 *) m_handle),
-                        sqlite3_errmsg((sqlite3 *) m_handle), &m_error);
-    return false;
-}
-
 void Handle::setupTrace()
 {
     unsigned flag = 0;
@@ -263,17 +244,6 @@ bool Handle::exec(const Statement &statement)
 long long Handle::getLastInsertedRowID()
 {
     return sqlite3_last_insert_rowid((sqlite3 *) m_handle);
-}
-
-void Handle::setConfig(Handle::Config config, bool enable)
-{
-    int dbConfig;
-    switch (config) {
-        case Config::Fts3Tokenizer:
-            dbConfig = SQLITE_DBCONFIG_ENABLE_FTS3_TOKENIZER;
-            break;
-    }
-    sqlite3_db_config((sqlite3 *) m_handle, dbConfig, enable, nullptr);
 }
 
 bool Handle::setCipherKey(const void *data, int size)

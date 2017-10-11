@@ -21,7 +21,7 @@
 #ifndef handle_pool_hpp
 #define handle_pool_hpp
 
-#include <WCDB/WINQ.h>
+#include <WCDB/abstract.h>
 #include <WCDB/concurrent_list.hpp>
 #include <WCDB/config.hpp>
 #include <WCDB/error.hpp>
@@ -40,6 +40,7 @@ class HandlePool {
 public:
     static RecyclableHandlePool GetPool(const std::string &path,
                                         const Configs &defaultConfigs);
+    static RecyclableHandlePool GetPool(Tag tag);
     static void PurgeFreeHandlesInAllPool();
 
 protected:

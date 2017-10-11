@@ -24,6 +24,7 @@
 #include <WCDB/column_type.hpp>
 #include <WCDB/declare.hpp>
 #include <WCDB/describable.hpp>
+#include <WCDB/literal_value.hpp>
 
 namespace WCDB {
 
@@ -38,7 +39,7 @@ public:
     Expr(const T &value,
          typename std::enable_if<std::is_arithmetic<T>::value ||
                                  std::is_enum<T>::value>::type * = nullptr)
-        : Describable(literalValue(value))
+        : Describable(LiteralValue(value))
     {
     }
 
@@ -57,6 +58,7 @@ public:
     Expr operator!() const;
     Expr operator+() const;
     Expr operator-() const;
+    Expr operator~() const;
 
     //binary
     Expr operator||(const Expr &operand) const; //or, not concat
@@ -78,8 +80,9 @@ public:
     Expr operator!=(const Expr &operand) const;
 
     Expr concat(const Expr &operand) const;
+    Expr substr(const Expr &start, const Expr &length) const;
 
-    template <typename T>
+    template <typename T = Expr>
     typename std::enable_if<std::is_base_of<Expr, T>::value, Expr>::type
     in(const std::list<const T> &exprList) const
     {
@@ -90,7 +93,7 @@ public:
         return expr;
     }
 
-    template <typename T>
+    template <typename T = Expr>
     typename std::enable_if<std::is_base_of<Expr, T>::value, Expr>::type
     notIn(const std::list<const T> &exprList) const
     {
@@ -101,7 +104,7 @@ public:
         return expr;
     }
 
-    template <typename T>
+    template <typename T = StatementSelect>
     typename std::enable_if<std::is_base_of<StatementSelect, T>::value,
                             Expr>::type
     in(const std::list<const T> &statementSelectList) const
@@ -113,7 +116,7 @@ public:
         return expr;
     }
 
-    template <typename T>
+    template <typename T = StatementSelect>
     typename std::enable_if<std::is_base_of<StatementSelect, T>::value,
                             Expr>::type
     notIn(const std::list<const T> &statementSelectList) const
@@ -156,7 +159,7 @@ public:
     static Expr Exists(const StatementSelect &statementSelect);
     static Expr NotExists(const StatementSelect &statementSelect);
 
-    template <typename T>
+    template <typename T = Expr>
     static typename std::enable_if<std::is_base_of<Expr, T>::value, Expr>::type
     Combine(const std::list<const T> &exprList)
     {
@@ -185,34 +188,53 @@ public:
     Expr upper(bool distinct = false) const;
     Expr round(bool distinct = false) const;
 
-    template <typename T>
+    template <typename T = Expr>
     static typename std::enable_if<std::is_base_of<Expr, T>::value, Expr>::type
-    Function(const std::string &function, const std::list<const T> &exprList)
+    Function(const std::string &function,
+             const std::list<const T> &exprList,
+             bool distinct = false)
     {
         Expr expr;
         expr.m_description.append(function + "(");
+        if (distinct) {
+            expr.m_description.append("DISTINCT ");
+        }
         expr.joinDescribableList(exprList);
         expr.m_description.append(")");
         return expr;
     }
 
-protected:
-    Expr function(const std::string &funtionName, bool distinct) const;
-
-    template <typename T>
-    std::string literalValue(
-        const T &value,
-        typename std::enable_if<std::is_arithmetic<T>::value ||
-                                std::is_enum<T>::value>::type * = nullptr)
+    template <typename T = Expr>
+    static typename std::enable_if<std::is_base_of<Expr, T>::value, Expr>::type
+    Case(const Expr &case_,
+         const std::list<std::pair<T, T>> &when,
+         const std::list<T> &else_)
     {
-        return std::to_string(value);
+        Expr expr;
+        expr.m_description.append("CASE " + case_.m_description + " ");
+        for (const auto &p : when) {
+            expr.m_description.append("WHEN ");
+            expr.m_description.append(p.first.m_description);
+            expr.m_description.append("THEN ");
+            expr.m_description.append(p.second.m_description);
+            expr.m_description.append(" ");
+        }
+        for (const auto &e : else_) {
+            expr.m_description.append("ELSE ");
+            expr.m_description.append(e.m_description);
+            expr.m_description.append(" ");
+        }
+        expr.m_description.append("END");
+        return expr;
     }
-    std::string literalValue(const char *value);
-    std::string literalValue(const std::string &value);
-    std::string literalValue(const std::nullptr_t &value);
-    std::string
-    literalValue(const typename ColumnTypeInfo<ColumnType::BLOB>::CType &value,
-                 int size);
+
+    //FTS3
+    Expr matchinfo() const;
+    Expr offsets() const;
+    Expr snippet() const;
+
+protected:
+    Expr(const LiteralValue &value);
 };
 
 } //namespace WCDB

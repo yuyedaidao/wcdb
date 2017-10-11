@@ -21,8 +21,10 @@
 #ifndef error_hpp
 #define error_hpp
 
+#include <WCDB/thread_local.hpp>
 #include <WCDB/utility.hpp>
 #include <climits>
+#include <functional>
 #include <map>
 #include <string>
 
@@ -102,6 +104,7 @@ public:
         Rollback = 5,
         GetThreadedHandle = 6,
         FlowOut = 7,
+        Tokenize = 8,
     };
     enum class SystemCallOperation : int {
         Lstat = 1,
@@ -205,12 +208,15 @@ public:
     static void Abort(const char *message, Error *outError = nullptr);
     static void Warning(const char *message, Error *outError = nullptr);
 
+    static void setThreadedSlient(bool slient);
+
 protected:
     int m_code;
     Error::Type m_type;
     Error::Infos m_infos;
 
     static std::shared_ptr<Error::ReportMethod> s_reportMethod;
+    static ThreadLocal<bool> s_slient;
 };
 
 } //namespace WCDB

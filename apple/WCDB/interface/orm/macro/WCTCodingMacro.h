@@ -28,15 +28,14 @@
 #define __WCDB_PROPERTIES(className) _s_##className##_properties
 
 #define WCDB_IMPLEMENTATION(className)                                         \
-    static WCTBinding *__WCDB_BINDING(className)(                              \
-        new WCTBinding(className.class));                                      \
+    static WCTBinding __WCDB_BINDING(className)(className.class);              \
     static WCTPropertyList __WCDB_PROPERTIES(className);                       \
     +(const WCTBinding *) objectRelationalMappingForWCDB                       \
     {                                                                          \
         if (self.class != className.class) {                                   \
             WCDB::Error::Abort("Inheritance is not supported for ORM");        \
         }                                                                      \
-        return __WCDB_BINDING(className);                                      \
+        return &__WCDB_BINDING(className);                                     \
     }                                                                          \
     +(const WCTPropertyList &) AllProperties                                   \
     {                                                                          \
@@ -46,7 +45,8 @@
     {                                                                          \
         static const WCTAnyProperty s_anyProperty(className.class);            \
         return s_anyProperty;                                                  \
-    }
+    }                                                                          \
+    +(WCTPropertyNamed) PropertyNamed { return WCTProperty::PropertyNamed; }
 
 //Property - declare column
 #define WCDB_PROPERTY(propertyName) __WCDB_PROPERTY_IMP(propertyName)
@@ -162,3 +162,9 @@
 //Virtual Table Argument
 #define WCDB_VIRTUAL_TABLE_ARGUMENT(className, left, right)                    \
     __WCDB_VIRTUAL_TABLE_ARGUMENT_IMP(className, left, right)
+
+#define WCDB_VIRTUAL_TABLE_TOKENIZE(className, tokenizeName)                   \
+    __WCDB_VIRTUAL_TABLE_ARGUMENT_IMP(className, "tokenize", tokenizeName)
+
+#define WCDB_VIRTUAL_TABLE_MODULE(className, moduleName)                       \
+    __WCDB_VIRTUAL_TABLE_MODULE_IMP(className, moduleName)

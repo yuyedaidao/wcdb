@@ -23,9 +23,9 @@
 
 @implementation WCTDatabase (Core)
 
-+ (NSString *)DefaultConfigName
++ (NSString *)DefaultBasicConfigName
 {
-    return @(WCDB::Database::defaultConfigName.c_str());
+    return @(WCDB::Database::defaultBasicConfigName.c_str());
 }
 
 + (NSString *)DefaultCipherConfigName
@@ -43,9 +43,14 @@
     return @(WCDB::Database::defaultCheckpointConfigName.c_str());
 }
 
-+ (NSString *)DefaultSyncConfigName
++ (NSString *)DefaultSynchronousConfigName
 {
-    return @(WCDB::Database::defaultSyncConfigName.c_str());
+    return @(WCDB::Database::defaultSynchronousConfigName.c_str());
+}
+
++ (NSString *)DefaultTokenizeConfigName
+{
+    return @(WCDB::Database::defaultTokenizeConfigName.c_str());
 }
 
 - (void)setConfig:(WCDB::Config)invoke forName:(NSString *)name withOrder:(WCDB::Configs::Order)order
@@ -58,9 +63,9 @@
     _database->setConfig(name.UTF8String, invoke);
 }
 
-- (void)setSyncEnabled:(BOOL)sync
+- (void)setSynchronousFull:(BOOL)full
 {
-    _database->setSyncEnabled(sync);
+    _database->setSynchronousFull(full);
 }
 
 @end

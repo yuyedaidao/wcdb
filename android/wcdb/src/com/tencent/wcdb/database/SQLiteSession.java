@@ -18,6 +18,7 @@ package com.tencent.wcdb.database;
 
 import android.database.sqlite.SQLiteTransactionListener;
 import android.os.Process;
+import android.util.Pair;
 
 import com.tencent.wcdb.BuildConfig;
 import com.tencent.wcdb.CursorWindow;
@@ -792,6 +793,15 @@ public final class SQLiteSession {
                     cancellationSignal); // might throw
         } finally {
             releaseConnection(); // might throw
+        }
+    }
+
+    public Pair<Integer, Integer> walCheckpoint(String dbName, int connectionFlags) {
+        acquireConnection(null, connectionFlags, null);
+        try {
+            return mConnection.walCheckpoint(dbName);
+        } finally {
+            releaseConnection();
         }
     }
 

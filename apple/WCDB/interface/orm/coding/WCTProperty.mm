@@ -22,8 +22,18 @@
 #import <WCDB/WCTProperty.h>
 #import <WCDB/WCTResult.h>
 
-WCTProperty::WCTProperty()
-    : WCDB::Column("")
+WCTPropertyNamed WCTProperty::PropertyNamed = ^(NSString *propertyName) {
+  return WCTProperty(propertyName);
+};
+
+WCTProperty::WCTProperty(const char *name)
+    : WCDB::Column(name)
+    , WCTPropertyBase(nil, nullptr)
+{
+}
+
+WCTProperty::WCTProperty(NSString *name)
+    : WCDB::Column(name ? name.UTF8String : "")
     , WCTPropertyBase(nil, nullptr)
 {
 }
@@ -43,11 +53,6 @@ WCTProperty::WCTProperty(const WCDB::Column &column, Class cls, const std::share
 WCTResultList WCTProperty::distinct() const
 {
     return WCTResultList(*this).distinct();
-}
-
-WCTProperty::operator WCTPropertyList() const
-{
-    return {*this};
 }
 
 WCTProperty WCTProperty::inTable(NSString *table) const
@@ -135,6 +140,21 @@ WCTExpr WCTProperty::round(bool distinct) const
     return WCTExpr(*this).round(distinct);
 }
 
+WCTExpr WCTProperty::matchinfo() const
+{
+    return WCTExpr(*this).matchinfo();
+}
+
+WCTExpr WCTProperty::offsets() const
+{
+    return WCTExpr(*this).offsets();
+}
+
+WCTExpr WCTProperty::snippet() const
+{
+    return WCTExpr(*this).snippet();
+}
+
 WCTColumnDef WCTProperty::def(WCTColumnType type, bool isPrimary, WCTOrderTerm term, bool autoIncrement) const
 {
     WCDB::ColumnDef columnDef(*this, (WCDB::ColumnType) type);
@@ -157,6 +177,11 @@ WCTExpr WCTProperty::operator+() const
 WCTExpr WCTProperty::operator-() const
 {
     return -WCTExpr(*this);
+}
+
+WCTExpr WCTProperty::operator~() const
+{
+    return ~WCTExpr(*this);
 }
 
 WCTExpr WCTProperty::operator||(const WCTExpr &operand) const
@@ -247,6 +272,11 @@ WCTExpr WCTProperty::operator!=(const WCTExpr &operand) const
 WCTExpr WCTProperty::concat(const WCTExpr &operand) const
 {
     return WCTExpr(*this).concat(operand);
+}
+
+WCTExpr WCTProperty::substr(const WCTExpr &start, const WCTExpr &length) const
+{
+    return WCTExpr(*this).substr(start, length);
 }
 
 WCTExpr WCTProperty::in(const WCTExprList &exprList) const
@@ -401,4 +431,28 @@ WCTExpr WCTProperty::isNot(const WCTExpr &operand) const
 NSString *WCTProperty::getDescription() const
 {
     return [NSString stringWithUTF8String:WCDB::Column::getDescription().c_str()];
+}
+
+WCTPropertyList::WCTPropertyList()
+    : std::list<const WCTProperty>()
+{
+}
+
+WCTPropertyList::WCTPropertyList(const WCTProperty &property)
+    : std::list<const WCTProperty>({property})
+{
+}
+
+WCTPropertyList::WCTPropertyList(std::initializer_list<const WCTProperty> il)
+    : std::list<const WCTProperty>(il)
+{
+}
+
+WCTPropertyList WCTPropertyList::inTable(NSString *tableName) const
+{
+    WCTPropertyList propertyList;
+    for (auto iter : *this) {
+        propertyList.push_back(iter.inTable(tableName));
+    }
+    return propertyList;
 }

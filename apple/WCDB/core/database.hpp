@@ -21,7 +21,7 @@
 #ifndef database_hpp
 #define database_hpp
 
-#include <WCDB/WINQ.h>
+#include <WCDB/abstract.h>
 #include <WCDB/core_base.hpp>
 #include <WCDB/handle.hpp>
 #include <WCDB/handle_pool.hpp>
@@ -37,6 +37,7 @@ class Database : public CoreBase {
 public:
     Database() = delete;
     Database(const std::string &path);
+    Database(Tag tag);
 
     //basic
     void setTag(Tag tag);
@@ -51,19 +52,28 @@ public:
     static void PurgeFreeHandlesInAllDatabases();
 
     //config
-    static const std::string defaultConfigName;
+    enum class ConfigOrder : Configs::Order {
+        Trace = 0,
+        Cipher = 1,
+        Basic = 2,
+        Synchronous = 3,
+        Checkpoint = 4,
+        Tokenize = 5,
+    };
+    static const std::string defaultBasicConfigName;
     static const std::string defaultCipherConfigName;
     static const std::string defaultTraceConfigName;
     static const std::string defaultCheckpointConfigName;
-    static const std::string defaultSyncConfigName;
+    static const std::string defaultSynchronousConfigName;
+    static const std::string defaultTokenizeConfigName;
     static const Configs defaultConfigs;
     void setConfig(const std::string &name,
                    const Config &config,
                    Configs::Order order);
     void setConfig(const std::string &name, const Config &config);
-    void setCipher(const void *key, int keySize);
-    void setCipher(const void *key, int keySize, int pageSize);
-    void setSyncEnabled(bool sync);
+    void setCipher(const void *key, int keySize, int pageSize = 4096);
+    void setSynchronousFull(bool full);
+    void setTokenizes(const std::list<std::string> &tokenizeNames);
     void setPerformanceTrace(const PerformanceTrace &trace);
     static void SetGlobalPerformanceTrace(const PerformanceTrace &globalTrace);
     static void SetGlobalSQLTrace(const SQLTrace &globalTrace);
