@@ -52,7 +52,7 @@ publishing {
     publications {
         wcdbRoomLibrary(MavenPublication) {
             groupId 'com.tencent.wcdb'
-            artifactId 'wcdb-room'
+            artifactId 'room'
             version rootProject.VERSION_NAME
 
             pom {
