@@ -689,6 +689,31 @@ public protocol SelectInterface: class {
 }
 
 extension SelectInterface where Self: Core {
+    
+    public func fetchObjects<Object: TableDecodable>(
+        on propertyConvertibleList: [PropertyConvertible] = Object.Properties.all,
+        fromTable table: String = "\(Object.self)",
+        where condition: Condition? = nil,
+        orderBy orderList: [OrderBy]? = nil,
+        limit: Limit? = nil,
+        offset: Offset? = nil) throws -> [Object] {
+        let select = try Select(with: self, on: propertyConvertibleList, table: table, isDistinct: false)
+        if condition != nil {
+            select.where(condition!)
+        }
+        if orderList != nil {
+            select.order(by: orderList!)
+        }
+        if limit != nil {
+            if offset != nil {
+                select.limit(limit!, offset: offset!)
+            } else {
+                select.limit(limit!)
+            }
+        }
+        return try select.allObjects()
+    }
+    
     public func getObjects<Object: TableDecodable>(
         on propertyConvertibleList: [PropertyConvertible],
         fromTable table: String,
