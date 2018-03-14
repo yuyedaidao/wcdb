@@ -21,7 +21,8 @@
 import Foundation
 
 public struct ColumnConstraintBinding {
-    let isPrimary: Bool
+    
+    public let isPrimary: Bool
     let isAutoIncrement: Bool
     let defaultValue: ColumnDef.DefaultType?
     let conflict: Conflict?
