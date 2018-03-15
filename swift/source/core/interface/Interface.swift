@@ -714,6 +714,18 @@ extension SelectInterface where Self: Core {
         return try select.allObjects()
     }
     
+    public func fetchObject<Object: TableDecodable>(
+        on propertyConvertibleList: [PropertyConvertible] = Object.Properties.all,
+        fromTable table: String = "\(Object.self)",
+        where condition: Condition? = nil) throws -> Object? {
+        let select = try Select(with: self, on: propertyConvertibleList, table: table, isDistinct: false)
+        if condition != nil {
+            select.where(condition!)
+        }
+        let items: [Object] = try select.allObjects()
+        return items.first
+    }
+    
     public func getObjects<Object: TableDecodable>(
         on propertyConvertibleList: [PropertyConvertible],
         fromTable table: String,
